@@ -88,9 +88,10 @@ mkdir -p /custom-services.d/python
 echo "Download ARLChecker service..."
 curl https://raw.githubusercontent.com/RandomNinjaAtk/arr-scripts/main/lidarr/python/ARLChecker.py -o /custom-services.d/python/ARLChecker.py
 curl https://raw.githubusercontent.com/RandomNinjaAtk/arr-scripts/main/lidarr/ARLChecker -o /custom-services.d/ARLChecker
+echo "Done"
 
-
-
+echo "Download YouTube Music search service..."
+curl https://raw.githubusercontent.com/RandomNinjaAtk/arr-scripts/main/lidarr/python/YTMusicSearch.py -o /custom-services.d/python/YTMusicSearch.py
 echo "Done"
 
 mkdir -p /config/extended
