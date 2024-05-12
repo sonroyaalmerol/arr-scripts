@@ -37,7 +37,8 @@ pip install --upgrade --no-cache-dir --break-system-packages \
   mutagen \
   r128gain \
   tidal-dl \
-  deemix && \
+  deemix \
+  ytmusicapi && \
 echo "************ setup SMA ************" && \
 echo "************ setup directory ************" && \
 mkdir -p ${SMA_PATH} && \

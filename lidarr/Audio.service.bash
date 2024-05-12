@@ -393,7 +393,7 @@ DownloadProcess () {
 
 	# Required Input Data
 	# $1 = Album ID to download from online Service
-	# $2 = Download Client Type (DEEZER or TIDAL)
+	# $2 = Download Client Type (DEEZER or TIDAL or YOUTUBE MUSIC)
 	# $3 = Album Year that matches Album ID Metadata
 	# $4 = Album Title that matches Album ID Metadata
 	# $5 = Expected Track Count
@@ -433,6 +433,11 @@ DownloadProcess () {
 		chmod 777 /config/extended/logs/downloaded/tidal
 	fi
 
+	if [ ! -d "/config/extended/logs/downloaded/youtube-music" ]; then
+		mkdir -p /config/extended/logs/downloaded/youtube-music
+		chmod 777 /config/extended/logs/downloaded/youtube-music
+	fi
+
 	if [ ! -d /config/extended/logs/downloaded/failed/deezer ]; then
 		mkdir -p /config/extended/logs/downloaded/failed/deezer
 		chmod 777 /config/extended/logs/downloaded/failed/deezer
@@ -441,6 +446,11 @@ DownloadProcess () {
 	if [ ! -d /config/extended/logs/downloaded/failed/tidal ]; then
 		mkdir -p /config/extended/logs/downloaded/failed/tidal
 		chmod 777 /config/extended/logs/downloaded/failed/tidal
+	fi
+
+	if [ ! -d /config/extended/logs/downloaded/failed/youtube-music ]; then
+		mkdir -p /config/extended/logs/downloaded/failed/youtube-music
+		chmod 777 /config/extended/logs/downloaded/failed/youtube-music
 	fi
 
 	if [ ! -d "$importPath" ]; then
@@ -457,6 +467,7 @@ DownloadProcess () {
 		return
     fi
 
+	
 	# check for log file
 	if [ "$2" == "DEEZER" ]; then
 		if [ -f /config/extended/logs/downloaded/deezer/$1 ]; then
@@ -476,6 +487,18 @@ DownloadProcess () {
 			return
 		fi
 		if [ -f /config/extended/logs/downloaded/failed/tidal/$1 ]; then
+			log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: ERROR :: Previously Attempted Download ($1)..."
+			return
+		fi
+	fi
+
+	# check for log file
+	if [ "$2" == "YOUTUBE MUSIC" ]; then
+		if [ -f /config/extended/logs/downloaded/youtube-music/$1 ]; then
+			log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: ERROR :: Previously Downloaded ($1)..."
+			return
+		fi
+		if [ -f /config/extended/logs/downloaded/failed/youtube-music/$1 ]; then
 			log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: ERROR :: Previously Attempted Download ($1)..."
 			return
 		fi
@@ -560,8 +583,30 @@ DownloadProcess () {
 			# If download failes X times, exit with error...
 			if [ $tidaldlFail -eq $failedDownloadAttemptThreshold ]; then
    				TidalClientTest
-       				if [ "$tidalClientTest" == "success" ]; then
+       			if [ "$tidalClientTest" == "success" ]; then
 	   				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: All $failedDownloadAttemptThreshold Download Attempts failed, skipping..."
+				fi
+			fi
+		fi
+
+		if [ "$2" == "YOUTUBE MUSIC" ]; then
+			yt-dlp -i --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "$1" 2>&1 | tee -a "/config/logs/$logFileName"
+
+			# Verify Client Works...
+			clientTestDlCount=$(find "$audioPath"/incomplete/ -type f -regex ".*/.*\.\(flac\|m4a\|mp3\)" | wc -l)
+			if [ $clientTestDlCount -le 0 ]; then
+				# Add +1 to failed attempts
+				ytmdlFail=$(( $ytmdlFail + 1))
+			else
+				# Reset for successful download
+				ytmdlFail=0
+			fi
+			
+			# If download failes X times, exit with error...
+			if [ $ytmdlFail -eq $failedDownloadAttemptThreshold ]; then
+				YouTubeMusicClientTest
+				if [ "$ytmClientTest" == "success" ]; then
+					log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType ::  All $failedDownloadAttemptThreshold Download Attempts failed, skipping..."
 				fi
 			fi
 		fi
@@ -621,6 +666,9 @@ DownloadProcess () {
 		if [ "$2" == "TIDAL" ]; then
 			touch /config/extended/logs/downloaded/failed/tidal/$1
 		fi
+		if [ "$2" == "YOUTUBE MUSIC" ]; then
+			touch /config/extended/logs/downloaded/failed/youtube-music/$1
+		fi
 		return
 	fi
 
@@ -631,6 +679,9 @@ DownloadProcess () {
 	fi
 	if [ "$2" == "TIDAL" ]; then
 		touch /config/extended/logs/downloaded/tidal/$1
+	fi
+	if [ "$2" == "YOUTUBE MUSIC" ]; then
+		touch /config/extended/logs/downloaded/youtube-music/$1
 	fi
 
 	# Tag with beets
@@ -904,6 +955,8 @@ DownloadQualityCheck () {
 				else
 					log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: No unwanted files found!"
 				fi
+			elif [ "$2" == "YOUTUBE MUSIC" ]; then
+				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: No unwanted files found!"
 			fi
 		fi
 	else
@@ -993,6 +1046,34 @@ DeezerClientTest () {
   		deezerClientTest="success"
 	fi
 
+}
+
+YouTubeMusicClientTest () {
+	log "YOUTUBE MUSIC :: YouTube Music client setup verification..."
+
+	yt-dlp -i --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "$ytmClientTestDownloadId" 2>&1 | tee -a "/config/logs/$logFileName"
+
+	if [ -d "/tmp/ytm-imgs" ]; then
+		rm -rf /tmp/ytm-imgs
+	fi
+ 	ytmClientTest="unknown"
+	downloadCount=$(find $audioPath/incomplete/ -type f -regex ".*/.*\.\(flac\|opus\|m4a\|mp3\)" | wc -l)
+	if [ $downloadCount -le 0 ]; then
+		log "YOUTUBE MUSIC :: ERROR :: Download failed"
+		log "YOUTUBE MUSIC :: ERROR :: Please review log for errors in client"
+		log "YOUTUBE MUSIC :: ERROR :: Try waiting for a few hours before trying again..."
+		log "YOUTUBE MUSIC :: ERROR :: Exiting..."
+		rm -rf $audioPath/incomplete/*
+		NotifyWebhook "Error" "YOUTUBE MUSIC not downloading but configured"
+  		ytmClientTest="fail"
+    		log "Script sleeping for $audioScriptInterval..."
+		sleep $audioScriptInterval
+		exit
+	else
+		rm -rf $audioPath/incomplete/*
+		log "YOUTUBE MUSIC :: Successfully Verified"
+  		ytmClientTest="success"
+	fi
 }
 
 LidarrRootFolderCheck () {
@@ -1219,17 +1300,26 @@ SearchProcess () {
 		if [ "$dlClientSource" == "deezer" ]; then
 			skipTidal=true
 			skipDeezer=false
+			skipYouTube=true
 		fi
 
 		if [ "$dlClientSource" == "tidal" ]; then
 			skipDeezer=true
 			skipTidal=false
+			skipYouTube=true
 		fi
 
-		if [ "$dlClientSource" == "both" ]; then
+		if [ "$dlClientSource" == "youtube" ]; then
+			skipDeezer=true
+			skipTidal=true
+			skipYouTube=false
+		fi
+
+		if [ "$dlClientSource" == "all" ]; then
 			skipDeezer=false
 			skipTidal=false
-		fi	
+			skipYouTube=false
+		fi
 
 		if [ "$skipDeezer" == "false" ]; then
 
@@ -1261,6 +1351,16 @@ SearchProcess () {
 					NotifyWebhook "ArtistError" "Update Musicbrainz Relationship Page: <https://musicbrainz.org/artist/${lidarrArtistForeignArtistId}/edit> for ${lidarrArtistName} with Tidal Artist Link"
 				fi
 				skipTidal=true
+			fi
+		fi
+		
+		if [ "$skipYouTube" == "false" ]; then
+			log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: YOUTUBE MUSIC :: Searching YouTube music for Artist Link..."
+			$youtubeArtistId=$(python /custom-services.d/python/YTMusicSearch.py artists "$lidarrArtistName")
+			if [ $youtubeArtistId -eq -1 ]; then
+				NotifyWebhook "ArtistError" "YouTube Music artist page not found"
+
+				skipYouTube=true
 			fi
 		fi
 
@@ -1345,7 +1445,7 @@ SearchProcess () {
 					
 					# Tidal Artist search
 					if [ "$lidarrDownloadImportNotfication" == "false" ]; then
-						if [ "$dlClientSource" == "both" ] || [ "$dlClientSource" == "tidal" ]; then
+						if [ "$dlClientSource" == "all" ] || [ "$dlClientSource" == "tidal" ]; then
 							for tidalArtistId in $(echo $tidalArtistIds); do
 								ArtistTidalSearch "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal" "$tidalArtistId" "$lyricFilter"
 								sleep 0.01
@@ -1357,7 +1457,7 @@ SearchProcess () {
 
 					# Deezer artist search
 					if [ "$lidarrDownloadImportNotfication" == "false" ]; then
-						if [ "$dlClientSource" == "both" ] || [ "$dlClientSource" == "deezer" ]; then
+						if [ "$dlClientSource" == "all" ] || [ "$dlClientSource" == "deezer" ]; then
 							for dId in ${!deezerArtistIds[@]}; do
 								deezerArtistId="${deezerArtistIds[$dId]}"
 								ArtistDeezerSearch "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal" "$deezerArtistId" "$lyricFilter"
@@ -1365,21 +1465,31 @@ SearchProcess () {
 							done
 						fi
 					fi
+
+					#log "3 : $lidarrDownloadImportNotfication"
+
+					# YouTube Music Artist search
+					if [ "$lidarrDownloadImportNotfication" == "false" ]; then
+						if [ "$dlClientSource" == "all" ] || [ "$dlClientSource" == "youtube" ]; then
+							ArtistYouTubeSearch "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal" "$youtubeArtistId" "$lyricFilter"
+							sleep 0.01
+						fi
+					fi
 				fi
 				
-				#log "3 : $lidarrDownloadImportNotfication"
+				#log "4 : $lidarrDownloadImportNotfication"
 				# Tidal fuzzy search
 				if [ "$lidarrDownloadImportNotfication" == "false" ]; then
-					if [ "$dlClientSource" == "both" ] || [ "$dlClientSource" == "tidal" ]; then
+					if [ "$dlClientSource" == "all" ] || [ "$dlClientSource" == "tidal" ]; then
 						FuzzyTidalSearch "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal" "$lyricFilter"
 						sleep 0.01
 					fi
 				fi
 
-				#log "4 : $lidarrDownloadImportNotfication"
+				#log "5 : $lidarrDownloadImportNotfication"
 				# Deezer fuzzy search
 				if [ "$lidarrDownloadImportNotfication" == "false" ]; then
-					if [ "$dlClientSource" == "both" ] || [ "$dlClientSource" == "deezer" ]; then
+					if [ "$dlClientSource" == "all" ] || [ "$dlClientSource" == "deezer" ]; then
 						FuzzyDeezerSearch "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal" "$lyricFilter"
 						sleep 0.01
 					fi
@@ -1729,6 +1839,72 @@ FuzzyTidalSearch () {
 	fi	
 }
 
+ArtistYouTubeSearch () {
+	# Required Inputs
+	# $1 Process ID
+	# $2 YouTube Music Artist ID
+	# $3 Lyric Type (true or false) - false = Clean, true = Explicit (Currently unimplemented)
+
+	# Get youtube music artist album list
+	if [ ! -f /config/extended/cache/youtube-music/$2-albums.json ]; then
+		python /custom-services.d/python/YTMusicSearch.py artist-albums "$2" > /config/extended/cache/youtube-music/$2-albums.json
+		sleep $sleepTimer
+	fi
+
+	if [ ! -f "/config/extended/cache/youtube-music/$2-albums.json" ]; then
+		return
+	fi
+
+	if [ "$3" == "true" ]; then
+		type="Explicit"
+	else
+		type="Clean"
+	fi
+
+
+	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Searching $2... (Track Count: $lidarrAlbumReleasesMinTrackCount-$lidarrAlbumReleasesMaxTrackCount)..."
+	ytmArtistAlbumsData=$(cat "/config/extended/cache/youtube-music/$2-albums.json" | jq -r ".[] | select((.trackCount <= $lidarrAlbumReleasesMaxTrackCount) and .trackCount >= $lidarrAlbumReleasesMinTrackCount)")
+
+	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Filtering results by lyric type is currently unimplemented with YouTube Music"
+	ytmArtistAlbumsIds=$(echo "${ytmArtistAlbumsData}" | jq -r ".[] | .audioPlaylistId")
+
+	if [ -z "$ytmArtistAlbumsIds" ]; then
+		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: ERROR :: No search results found..."
+		return
+	fi
+
+	searchResultCount=$(echo "$ytmArtistAlbumsIds" | wc -l)
+	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $searchResultCount search results found"
+	for ytmArtistAlbumId in $(echo $ytmArtistAlbumsIds); do
+			
+		ytmArtistAlbumData=$(echo "$ytmArtistAlbumsData" | jq -r "select(.audioPlaylistId=="$ytmArtistAlbumId")")
+		downloadedAlbumTitle="$(echo ${ytmArtistAlbumData} | jq -r .title)"
+		ytmAlbumTitleClean=$(echo ${downloadedAlbumTitle} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
+  		ytmAlbumTitleClean="${ytmAlbumTitleClean:0:130}"
+		downloadedReleaseYear="$(echo ${ytmArtistAlbumData} | jq -r .year)"
+		downloadedTrackCount=$(echo "$ytmArtistAlbumData"| jq -r .trackCount)
+
+		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Checking for Match..."
+		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Calculating Damerau-Levenshtein distance..."
+		diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmAlbumTitleClean,,}\"))" 2>/dev/null)
+		if [ "$diff" -le "$matchDistance" ]; then
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
+
+			# Execute Download
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $downloadedAlbumTitle ($downloadedReleaseYear)"
+			
+			DownloadProcess "$2::$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount"
+			# End search if lidarr was successfully notified for import
+			if [ "$lidarrDownloadImportNotfication" == "true" ]; then
+				break
+			fi
+		else
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
+		fi
+	done
+	
+}
+
 CheckLidarrBeforeImport () {
 
 	alreadyImported=false		
@@ -1830,11 +2006,11 @@ AudioProcess () {
   
   DownloadFormat
   
-  if [ "$dlClientSource" == "deezer" ] || [ "$dlClientSource" == "both" ]; then
+  if [ "$dlClientSource" == "deezer" ] || [ "$dlClientSource" == "all" ]; then
   	DeemixClientSetup
   fi
   
-  if [ "$dlClientSource" == "tidal" ] || [ "$dlClientSource" == "both" ]; then
+  if [ "$dlClientSource" == "tidal" ] || [ "$dlClientSource" == "all" ]; then
   	TidalClientSetup
   fi
   
@@ -1843,11 +2019,11 @@ AudioProcess () {
   # Get artist list for LidarrMissingAlbumSearch process, to prevent searching for artists that will not be processed by the script
   lidarrMissingAlbumArtistsData=$(wget --timeout=0 -q -O - "$arrUrl/api/v1/artist?apikey=$arrApiKey" | jq -r .[])
   
-  if [ "$dlClientSource" == "deezer" ] || [ "$dlClientSource" == "tidal" ] || [ "$dlClientSource" == "both" ]; then
+  if [ "$dlClientSource" == "deezer" ] || [ "$dlClientSource" == "tidal" ] || [ "$dlClientSource" == "youtube" ] || [ "$dlClientSource" == "all" ]; then
   	GetMissingCutOffList
   else
   	log "ERROR :: No valid dlClientSource set"
-  	log "ERROR :: Expected configuration :: deezer or tidal or both"
+  	log "ERROR :: Expected configuration :: deezer or tidal or youtube or all"
   	log "ERROR :: dlClientSource set as: \"$dlClientSource\""
   fi
   
