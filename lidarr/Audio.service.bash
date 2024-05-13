@@ -57,6 +57,10 @@ verifyConfig () {
   	deezerClientTestDownloadId="197472472"
   fi
 
+  if [ -z "$ytmClientTestDownloadId" ]; then
+  	ytmClientTestDownloadId="KwN_f0fTHoE"
+  fi
+
   if [ -z "$ignoreInstrumentalRelease" ]; then
   	ignoreInstrumentalRelease="true"
   fi
@@ -1076,7 +1080,7 @@ YouTubeMusicClientSetup () {
 YouTubeMusicClientTest () {
 	log "YOUTUBE MUSIC :: YouTube Music client setup verification..."
 
-	yt-dlp -i --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "$ytmClientTestDownloadId" 2>&1 | tee -a "/config/logs/$logFileName"
+	yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/watch?v=$ytmClientTestDownloadId" 2>&1 | tee -a "/config/logs/$logFileName"
 
 	if [ -d "/tmp/ytm-imgs" ]; then
 		rm -rf /tmp/ytm-imgs
@@ -1304,6 +1308,8 @@ SearchProcess () {
 		lidarrAlbumReleaseDate=${lidarrAlbumReleaseDate:0:10}
 		lidarrAlbumReleaseDateClean="$(echo $lidarrAlbumReleaseDate | sed -e "s%[^[:digit:]]%%g")"
 		lidarrAlbumReleaseYear="${lidarrAlbumReleaseDate:0:4}"
+
+		lidarrArtistCountry=$(curl https://musicbrainz.org/ws/2/artist/${lidarrArtistForeignArtistId}?fmt=json | jq -r ".country")
 		
 		currentDate="$(date "+%F")"
 		currentDateClean="$(echo "$currentDate" | sed -e "s%[^[:digit:]]%%g")"
@@ -1401,32 +1407,25 @@ SearchProcess () {
 		if [ -f /temp-release-list ]; then
 			rm /temp-release-list 
 		fi
-		if [ -f /temp-release-list-no-disambiguation  ]; then
-			rm /temp-release-list-no-disambiguation
-		fi
 
 		for releaseId in $(echo "$lidarrAlbumReleaseIds"); do
 			releaseTitle=$(echo "$lidarrAlbumData" | jq -r ".releases[] | select(.id==$releaseId) | .title")
 			releaseDisambiguation=$(echo "$lidarrAlbumData" | jq -r ".releases[] | select(.id==$releaseId) | .disambiguation")
+			releaseForeignId=$(echo "$lidarrAlbumData" | jq -r ".releases[] | select(.id==$releaseId) | .foreignReleaseId")
 			if [ -z "$releaseDisambiguation" ]; then
 				releaseDisambiguation=""
 			else
 				releaseDisambiguation=" ($releaseDisambiguation)" 
 			fi
 			echo "${releaseTitle}${releaseDisambiguation}" >> /temp-release-list
-			echo "${releaseTitle}" >> /temp-release-list-no-disambiguation
 		done
   		echo "$lidarrAlbumTitle" >> /temp-release-list
-  		echo "$lidarrAlbumTitle" >> /temp-release-list-no-disambiguation 
 
 		# Get Release Titles
 		OLDIFS="$IFS"
 		IFS=$'\n'
 		lidarrReleaseTitles=$(cat /temp-release-list | awk '{ print length, $0 }' | sort -u -n -s -r | cut -d" " -f2-)
 		lidarrReleaseTitles=($(echo "$lidarrReleaseTitles"))
-
-		lidarrReleaseTitlesNoDisambiguation=$(cat /temp-release-list-no-disambiguation | awk '{ print length, $0 }' | sort -u -n -s -r | cut -d" " -f2-)
-		lidarrReleaseTitlesNoDisambiguation=($(echo "$lidarrReleaseTitlesNoDisambiguation"))
 		IFS="$OLDIFS"
 
 		loopCount=0
@@ -1456,13 +1455,6 @@ SearchProcess () {
 				lidarrAlbumReleaseTitleSearchClean="$(echo "$lidarrReleaseTitle" | sed -e "s%[^[:alpha:][:digit:]]% %g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')"
 				lidarrAlbumReleaseTitleFirstWord="$(echo "$lidarrReleaseTitle"  | awk '{ print $1 }')"
 				lidarrAlbumReleaseTitleFirstWord="${lidarrAlbumReleaseTitleFirstWord:0:3}"
-
-				lidarrReleaseTitleNoDisambiguation="${lidarrReleaseTitlesNoDisambiguation[$title]}"
-				lidarrAlbumReleaseTitleCleanND=$(echo "$lidarrReleaseTitleNoDisambiguation" | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
-    			lidarrAlbumReleaseTitleCleanND="${lidarrAlbumReleaseTitleCleanND:0:130}"
-				lidarrAlbumReleaseTitleSearchCleanND="$(echo "$lidarrReleaseTitleNoDisambiguation" | sed -e "s%[^[:alpha:][:digit:]]% %g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')"
-				lidarrAlbumReleaseTitleFirstWordND="$(echo "$lidarrReleaseTitleNoDisambiguation"  | awk '{ print $1 }')"
-				lidarrAlbumReleaseTitleFirstWordND="${lidarrAlbumReleaseTitleFirstWordND:0:3}"
 
 				albumTitleSearch="$(jq -R -r @uri <<<"${lidarrAlbumReleaseTitleSearchClean}")"
 				#echo "Debugging :: $loopCount :: $releaseProcessCount :: $lidarrArtistForeignArtistId :: $lidarrReleaseTitle :: $lidarrAlbumReleasesMinTrackCount-$lidarrAlbumReleasesMaxTrackCount :: $lidarrAlbumReleaseTitleFirstWord :: $albumArtistNameSearch :: $albumTitleSearch"
@@ -1902,7 +1894,7 @@ ArtistYouTubeSearch () {
 
 	# Get youtube music artist album list
 	if [ ! -f /config/extended/cache/youtube-music/$2-albums.json ]; then
-		python /custom-services.d/python/YTMusicSearch.py artist-albums "$2" > /config/extended/cache/youtube-music/$2-albums.json
+		python /custom-services.d/python/YTMusicSearch.py artist-albums "$2" "$lidarrArtistCountry" > /config/extended/cache/youtube-music/$2-albums.json
 		sleep $sleepTimer
 	fi
 
@@ -1947,10 +1939,8 @@ ArtistYouTubeSearch () {
 		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Checking for Match..."
 		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Calculating Damerau-Levenshtein distance..."
 		diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmAlbumTitleClean,,}\"))" 2>/dev/null)
-		diffAlt=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleCleanND,,}\", \"${ytmAlbumTitleClean,,}\"))" 2>/dev/null)
-		if [ "$diff" -le "$matchDistance" ] || [ "$diffAlt" -le "$matchDistance" ]; then
+		if [ "$diff" -le "$matchDistance" ]; then
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
-			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleCleanND vs $ytmAlbumTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diffAlt"
 
 			# Execute Download
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $downloadedAlbumTitle ($downloadedReleaseYear)"
@@ -1963,7 +1953,6 @@ ArtistYouTubeSearch () {
 			fi
 		else
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
-			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleCleanND vs $ytmAlbumTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diffAlt) greater than $matchDistance"
 		fi
 	done
 	
@@ -1982,7 +1971,7 @@ FuzzyYouTubeMusicSearch () {
 
 	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Searching... (Track Count: $lidarrAlbumReleasesMinTrackCount-$lidarrAlbumReleasesMaxTrackCount)..."
 	
-	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py songs "${lidarrReleaseTitle} ${lidarrArtistName} ${lidarrAlbumReleaseYear}")
+	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py songs "${lidarrReleaseTitle} ${lidarrArtistName} ${lidarrAlbumReleaseYear}" "${lidarrArtistCountry}")
 
 	ytmSearch=$(echo "$ytmSearch" | jq -r )
 
@@ -2006,13 +1995,13 @@ FuzzyYouTubeMusicSearch () {
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Calculating Damerau-Levenshtein distance..."
 			diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmSongTitleClean,,}\"))" 2>/dev/null)
 			if [ "$diff" -le "$matchDistance" ]; then
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Tidal MATCH Found :: Calculated Difference = $diff"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
 				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $ytmSongTitle"
 				
 				DownloadProcess "$ytmVideoID" "YOUTUBE MUSIC" "" "$ytmSongTitle" "$downloadedTrackCount"
 
 			else
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Tidal Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
 			fi
 			# End search if lidarr was successfully notified for import
 			if [ "$lidarrDownloadImportNotfication" == "true" ]; then

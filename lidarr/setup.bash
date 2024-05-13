@@ -38,7 +38,8 @@ pip install --upgrade --no-cache-dir --break-system-packages \
   r128gain \
   tidal-dl \
   deemix \
-  ytmusicapi && \
+  ytmusicapi \
+  countryinfo && \
 echo "************ setup SMA ************" && \
 echo "************ setup directory ************" && \
 mkdir -p ${SMA_PATH} && \
