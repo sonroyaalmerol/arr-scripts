@@ -591,9 +591,9 @@ DownloadProcess () {
 
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			if [ ${#1} -gt 11 ]; then
-				yt-dlp -i --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/playlist?list=$1" 2>&1 | tee -a "/config/logs/$logFileName"
+				yt-dlp -i --sponsorblock-remove music_offtopic --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/playlist?list=$1" 2>&1 | tee -a "/config/logs/$logFileName"
 			else
-				yt-dlp -i --format ba[ext=m4a] -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/watch?v=$1" 2>&1 | tee -a "/config/logs/$logFileName"
+				yt-dlp -i --sponsorblock-remove music_offtopic --format ba[ext=m4a] -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/watch?v=$1" 2>&1 | tee -a "/config/logs/$logFileName"
 			fi
 
 			# Verify Client Works...
@@ -1402,7 +1402,7 @@ SearchProcess () {
 			rm /temp-release-list 
 		fi
 		if [ -f /temp-release-list-no-disambiguation  ]; then
-			rm /temp-release-list-no-disambiguation t 
+			rm /temp-release-list-no-disambiguation
 		fi
 
 		for releaseId in $(echo "$lidarrAlbumReleaseIds"); do
