@@ -1,3 +1,3 @@
 #!/usr/bin/with-contenv bash
-curl https://raw.githubusercontent.com/RandomNinjaAtk/arr-scripts/main/sabnzbd/setup.bash | bash
+curl https://raw.githubusercontent.com/sonroyaalmerol/arr-scripts/develop/sabnzbd/setup.bash | bash
 exit

@@ -1,3 +1,3 @@
 #!/usr/bin/with-contenv bash
-curl https://raw.githubusercontent.com/RandomNinjaAtk/arr-scripts/main/radarr/setup.bash | bash
+curl https://raw.githubusercontent.com/sonroyaalmerol/arr-scripts/develop/radarr/setup.bash | bash
 exit
