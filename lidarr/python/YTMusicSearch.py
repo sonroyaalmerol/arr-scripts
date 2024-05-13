@@ -90,8 +90,6 @@ def get_artist_albums(artist_id, country=None):
                 for single in artist['singles']['results']:
                     details = yt.get_album(single['browseId'])
                     details['browseId'] = single['browseId']
-                    details['audioPlaylistId'] = details['tracks'][0]['videoId']
-
                     detailed_albums.append(details)
         
     json_string = json.dumps(detailed_albums)
