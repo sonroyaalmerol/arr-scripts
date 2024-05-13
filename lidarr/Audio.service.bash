@@ -1927,18 +1927,27 @@ ArtistYouTubeSearch () {
 		downloadedAlbumTitle="$(echo ${ytmArtistAlbumData} | jq -r .title)"
 		ytmAlbumTitleClean=$(echo ${downloadedAlbumTitle} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
   		ytmAlbumTitleClean="${ytmAlbumTitleClean:0:130}"
+		ytmAlbumTitleCleanTmp="${ytmAlbumTitleClean}"
 
 		lidarrArtistNameClean=$(echo ${lidarrArtistName} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
 		lidarrArtistNameClean="${lidarrArtistNameClean:0:130}"
 
 		ytmAlbumTitleClean="${ytmAlbumTitleClean/$lidarrArtistNameClean/}"
 
+		if [[ -z "${ytmAlbumTitleClean// }" ]]; then
+			ytmAlbumTitleClean="${ytmAlbumTitleCleanTmp}"
+		fi
+
 		downloadedReleaseYear="$(echo ${ytmArtistAlbumData} | jq -r .year)"
 		downloadedTrackCount=$(echo "$ytmArtistAlbumData"| jq -r .trackCount)
 
 		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Checking for Match..."
 		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Calculating Damerau-Levenshtein distance..."
-		diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmAlbumTitleClean,,}\"))" 2>/dev/null)
+		
+		lidarrAlbumReleaseTitleCleanNormalized=$(python -c "import unicodedata; print(''.join(c for c in unicodedata.normalize('NFD', '${lidarrAlbumReleaseTitleClean}'.lower()) if unicodedata.category(c) != 'Mn'))")
+		ytmAlbumTitleCleanNormalized=$(python -c "import unicodedata; print(''.join(c for c in unicodedata.normalize('NFD', '${ytmAlbumTitleClean}'.lower()) if unicodedata.category(c) != 'Mn'))")
+		
+		diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleCleanNormalized,,}\", \"${ytmAlbumTitleCleanNormalized,,}\"))" 2>/dev/null)
 		if [ "$diff" -le "$matchDistance" ]; then
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
 
