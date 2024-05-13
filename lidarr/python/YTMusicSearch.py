@@ -17,6 +17,16 @@ def search_artist(query):
     result = search_results[0]
     print(result['browseId'])
 
+def search_music(query):
+    yt = YTMusic()
+    search_results = yt.search(
+        query=query,
+        filter='songs',
+    )
+    
+    json_string = json.dumps(search_results)
+    print(json_string)
+
 def get_artist_albums(artist_id):
     yt = YTMusic()
     artist = yt.get_artist(artist_id)
@@ -57,4 +67,8 @@ if __name__ == '__main__':
 
         if query_type == 'artists':
             search_artist(query)
+            sys.exit()
+
+        if query_type == 'songs':
+            search_music(query)
             sys.exit()

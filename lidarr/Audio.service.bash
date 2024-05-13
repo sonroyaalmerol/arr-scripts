@@ -1537,6 +1537,15 @@ SearchProcess () {
 					fi
 				fi
 
+				#log "6 : $lidarrDownloadImportNotfication"
+				# YouTube Music fuzzy search
+				if [ "$lidarrDownloadImportNotfication" == "false" ]; then
+					if [ "$dlClientSource" == "all" ] || [ "$dlClientSource" == "youtube" ]; then
+						FuzzyYouTubeMusicSearch "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal" "$lyricFilter"
+						sleep 0.01
+					fi
+				fi
+
 				# End search if lidarr was successfully notified for import
 				if [ "$lidarrDownloadImportNotfication" == "true" ]; then
 					break
@@ -1958,6 +1967,62 @@ ArtistYouTubeSearch () {
 		fi
 	done
 	
+}
+
+FuzzyYouTubeMusicSearch () {
+	# Required Inputs
+	# $1 Process ID
+	# $2 Lyric Type (explicit = true, clean = false)
+
+	if [ "$2" == "true" ]; then
+		type="Explicit"
+	else
+		type="Clean"
+	fi
+
+	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Searching... (Track Count: $lidarrAlbumReleasesMinTrackCount-$lidarrAlbumReleasesMaxTrackCount)..."
+	
+	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py songs "${lidarrReleaseTitle} ${lidarrArtistName} ${lidarrAlbumReleaseYear}")
+
+	ytmSearch=$(echo "$ytmSearch" | jq -r )
+
+	searchResultCount=$(echo "$ytmSearch" | jq -r ".[].videoId" | sort -u | wc -l)
+	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $searchResultCount search results found"
+	if [ ! -z "$ytmSearch" ]; then
+		for ytmVideoID in $(echo "$ytmSearch" | jq -r ".[].videoId" | sort -u); do
+			ytmSongData="$(echo "$ytmSearch" | jq -r ".[] | select(.videoId==\"$ytmVideoID\")")"
+			ytmSongTitle=$(echo "$ytmSongData"| jq -r .title)
+			ytmSongTitleClean=$(echo ${ytmSongTitle} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
+   			ytmSongTitleClean="${ytmSongTitleClean:0:130}"
+
+			lidarrArtistNameClean=$(echo ${lidarrArtistName} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
+			lidarrArtistNameClean="${lidarrArtistNameClean:0:130}"
+
+			ytmSongTitleClean="${ytmSongTitleClean/$lidarrArtistNameClean/}"
+
+			downloadedTrackCount="1"
+
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Checking for Match..."
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Calculating Damerau-Levenshtein distance..."
+			diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmSongTitleClean,,}\"))" 2>/dev/null)
+			if [ "$diff" -le "$matchDistance" ]; then
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Tidal MATCH Found :: Calculated Difference = $diff"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $ytmSongTitle"
+				
+				DownloadProcess "$ytmVideoID" "YOUTUBE MUSIC" "" "$ytmSongTitle" "$downloadedTrackCount"
+
+			else
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Tidal Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
+			fi
+			# End search if lidarr was successfully notified for import
+			if [ "$lidarrDownloadImportNotfication" == "true" ]; then
+				break
+			fi
+		done
+		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: ERROR :: Albums found, but none matching search criteria..."
+	else
+		log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: ERROR :: No results found..."
+	fi	
 }
 
 CheckLidarrBeforeImport () {
