@@ -19,13 +19,25 @@ def search_artist(query):
 
 def get_artist_albums(artist_id):
     yt = YTMusic()
-    albums = yt.get_artist_albums(artist_id)
+    artist = yt.get_artist(artist_id)
+
     detailed_albums = []
 
-    for album in albums:
-        details = yt.get_album(album['browseId'])
-        details['browseId'] = album['browseId']
-        detailed_albums.append(details)
+    if 'albums' in artist:
+        if 'results' in artist['albums']:
+            for album in artist['albums']['results']:
+                details = yt.get_album(album['browseId'])
+                details['browseId'] = album['browseId']
+                detailed_albums.append(details)
+    
+    if 'singles' in artist:
+        if 'results' in artist['singles']:
+            for single in artist['singles']['results']:
+                details = yt.get_album(single['browseId'])
+                details['browseId'] = single['browseId']
+                details['audioPlaylistId'] = details['tracks'][0]['videoId']
+
+                detailed_albums.append(details)
 
     json_string = json.dumps(detailed_albums)
     print(json_string)
