@@ -595,9 +595,9 @@ DownloadProcess () {
 
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			if [ ${#1} -gt 11 ]; then
-				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/playlist?list=$1" 2>&1 | tee -a "/config/logs/$logFileName"
+				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -o "$audioPath/incomplete/%(track_number)s - %(track)s.%(ext)s" "https://youtube.com/playlist?list=$1" 2>&1 | tee -a "/config/logs/$logFileName"
 			else
-				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] -x --audio-quality 0 -o "$audioPath/incomplete/%(title)s.%(ext)s" "https://youtube.com/watch?v=$1" 2>&1 | tee -a "/config/logs/$logFileName"
+				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] -x --audio-quality 0 -o "$audioPath/incomplete/%(track_number)s - %(track)s.%(ext)s" "https://youtube.com/watch?v=$1" 2>&1 | tee -a "/config/logs/$logFileName"
 			fi
 
 			# Verify Client Works...
@@ -1980,37 +1980,42 @@ FuzzyYouTubeMusicSearch () {
 
 	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Searching... (Track Count: $lidarrAlbumReleasesMinTrackCount-$lidarrAlbumReleasesMaxTrackCount)..."
 	
-	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py songs "${lidarrReleaseTitle} ${lidarrArtistName} ${lidarrAlbumReleaseYear}" "${lidarrArtistCountry}")
+	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py fuzzy_search "${lidarrReleaseTitle} ${lidarrArtistName}" "${lidarrArtistCountry}")
 
 	ytmSearch=$(echo "$ytmSearch" | jq -r )
 
-	searchResultCount=$(echo "$ytmSearch" | jq -r ".[].videoId" | sort -u | wc -l)
+	searchResultCount=$(echo "$ytmSearch" | jq -r ".[] | .audioPlaylistId" | sort -u | wc -l)
 	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $searchResultCount search results found"
 	if [ ! -z "$ytmSearch" ]; then
-		for ytmVideoID in $(echo "$ytmSearch" | jq -r ".[].videoId" | sort -u); do
-			ytmSongData="$(echo "$ytmSearch" | jq -r ".[] | select(.videoId==\"$ytmVideoID\")")"
-			ytmSongTitle=$(echo "$ytmSongData"| jq -r .title)
-			ytmSongTitleClean=$(echo ${ytmSongTitle} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
-   			ytmSongTitleClean="${ytmSongTitleClean:0:130}"
+		for ytmAlbumId in $(echo "$ytmSearch" | jq -r ".[] | .audioPlaylistId" | sort -u); do
+			ytmAlbumData="$(echo "$ytmSearch" | jq -r ".[] | select(.audioPlaylistId==\"$ytmAlbumId\")")"
+			ytmAlbumTitle=$(echo "$ytmAlbumData"| jq -r .title)
+			ytmAlbumTitleClean=$(echo ${ytmAlbumTitle} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
+   			ytmAlbumTitleClean="${ytmAlbumTitleClean:0:130}"
+			ytmAlbumTitleCleanTmp="${ytmAlbumTitleClean}"
 
 			lidarrArtistNameClean=$(echo ${lidarrArtistName} | sed -e "s%[^[:alpha:][:digit:]]%%g" -e "s/  */ /g" | sed 's/^[.]*//' | sed  's/[.]*$//g' | sed  's/^ *//g' | sed 's/ *$//g')
 			lidarrArtistNameClean="${lidarrArtistNameClean:0:130}"
 
-			ytmSongTitleClean="${ytmSongTitleClean/$lidarrArtistNameClean/}"
+			ytmAlbumTitleClean="${ytmAlbumTitleClean/$lidarrArtistNameClean/}"
+
+			if [[ -z "${ytmAlbumTitleClean// }" ]]; then
+				ytmAlbumTitleClean="${ytmAlbumTitleCleanTmp}"
+			fi
 
 			downloadedTrackCount="1"
 
-			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Checking for Match..."
-			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Calculating Damerau-Levenshtein distance..."
-			diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmSongTitleClean,,}\"))" 2>/dev/null)
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Checking for Match..."
+			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: Calculating Damerau-Levenshtein distance..."
+			diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmAlbumTitleClean,,}\"))" 2>/dev/null)
 			if [ "$diff" -le "$matchDistance" ]; then
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $ytmSongTitle"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $ytmAlbumTitle"
 				
-				DownloadProcess "$ytmVideoID" "YOUTUBE MUSIC" "" "$ytmSongTitle" "$downloadedTrackCount"
+				DownloadProcess "$ytmAlbumId" "YOUTUBE MUSIC" "" "$ytmAlbumTitle" "$downloadedTrackCount"
 
 			else
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
 			fi
 			# End search if lidarr was successfully notified for import
 			if [ "$lidarrDownloadImportNotfication" == "true" ]; then

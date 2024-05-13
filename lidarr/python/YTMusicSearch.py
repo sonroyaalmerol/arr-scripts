@@ -58,15 +58,21 @@ def search_artist(query):
 def search_music(query, country=None):
     langs = get_languages(country)
 
-    search_results = []
+    detailed_albums = []
+
     for lang in langs:
         yt = YTMusic(language=lang)
-        search_results = search_results + yt.search(
+        album_results = yt.search(
             query=query,
-            filter='songs',
+            filter='albums',
         )
+
+        for result in search_results:
+            details = yt.get_album(result.browseId)
+            details['browseId'] = result.browseId
+            detailed_albums.append(details)
         
-    json_string = json.dumps(search_results)
+    json_string = json.dumps(detailed_albums)
     print(json_string)
 
 def get_artist_albums(artist_id, country=None):
@@ -117,6 +123,6 @@ if __name__ == '__main__':
             search_artist(query)
             sys.exit()
 
-        if query_type == 'songs':
+        if query_type == 'fuzzy_search':
             search_music(query, country)
             sys.exit()
