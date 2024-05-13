@@ -1308,6 +1308,8 @@ SearchProcess () {
 		lidarrAlbumReleaseDate=${lidarrAlbumReleaseDate:0:10}
 		lidarrAlbumReleaseDateClean="$(echo $lidarrAlbumReleaseDate | sed -e "s%[^[:digit:]]%%g")"
 		lidarrAlbumReleaseYear="${lidarrAlbumReleaseDate:0:4}"
+
+		lidarrArtistCountry=$(curl https://musicbrainz.org/ws/2/artist/${lidarrArtistForeignArtistId}?fmt=json | jq -r ".country")
 		
 		currentDate="$(date "+%F")"
 		currentDateClean="$(echo "$currentDate" | sed -e "s%[^[:digit:]]%%g")"
@@ -1409,6 +1411,7 @@ SearchProcess () {
 		for releaseId in $(echo "$lidarrAlbumReleaseIds"); do
 			releaseTitle=$(echo "$lidarrAlbumData" | jq -r ".releases[] | select(.id==$releaseId) | .title")
 			releaseDisambiguation=$(echo "$lidarrAlbumData" | jq -r ".releases[] | select(.id==$releaseId) | .disambiguation")
+			releaseForeignId=$(echo "$lidarrAlbumData" | jq -r ".releases[] | select(.id==$releaseId) | .foreignReleaseId")
 			if [ -z "$releaseDisambiguation" ]; then
 				releaseDisambiguation=""
 			else
@@ -1891,7 +1894,7 @@ ArtistYouTubeSearch () {
 
 	# Get youtube music artist album list
 	if [ ! -f /config/extended/cache/youtube-music/$2-albums.json ]; then
-		python /custom-services.d/python/YTMusicSearch.py artist-albums "$2" > /config/extended/cache/youtube-music/$2-albums.json
+		python /custom-services.d/python/YTMusicSearch.py artist-albums "$2" "$lidarrArtistCountry" > /config/extended/cache/youtube-music/$2-albums.json
 		sleep $sleepTimer
 	fi
 
@@ -1968,7 +1971,7 @@ FuzzyYouTubeMusicSearch () {
 
 	log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Searching... (Track Count: $lidarrAlbumReleasesMinTrackCount-$lidarrAlbumReleasesMaxTrackCount)..."
 	
-	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py songs "${lidarrReleaseTitle} ${lidarrArtistName} ${lidarrAlbumReleaseYear}")
+	ytmSearch=$(python /custom-services.d/python/YTMusicSearch.py songs "${lidarrReleaseTitle} ${lidarrArtistName} ${lidarrAlbumReleaseYear}" "${lidarrArtistCountry}")
 
 	ytmSearch=$(echo "$ytmSearch" | jq -r )
 
@@ -1992,13 +1995,13 @@ FuzzyYouTubeMusicSearch () {
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Calculating Damerau-Levenshtein distance..."
 			diff=$(python -c "from pyxdameraulevenshtein import damerau_levenshtein_distance; print(damerau_levenshtein_distance(\"${lidarrAlbumReleaseTitleClean,,}\", \"${ytmSongTitleClean,,}\"))" 2>/dev/null)
 			if [ "$diff" -le "$matchDistance" ]; then
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Tidal MATCH Found :: Calculated Difference = $diff"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
 				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $ytmSongTitle"
 				
 				DownloadProcess "$ytmVideoID" "YOUTUBE MUSIC" "" "$ytmSongTitle" "$downloadedTrackCount"
 
 			else
-				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: Tidal Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
+				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmSongTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
 			fi
 			# End search if lidarr was successfully notified for import
 			if [ "$lidarrDownloadImportNotfication" == "true" ]; then
