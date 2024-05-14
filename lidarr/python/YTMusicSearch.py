@@ -15,29 +15,32 @@ def get_languages(country):
         
     country = country.lower()
 
-    country_data = CountryInfo(country)
-    languages = country_data.languages()
-    
     try:
-        zh_index = languages.index('zh')
-    except ValueError:
-        zh_index = -1
-    
-    if zh_index != -1:
-        if country == 'tw':
-            languages[zh_index] = 'zh_TW'
-        else:
-            languages[zh_index] = 'zh_CN'
+        country_data = CountryInfo(country)
+        languages = country_data.languages()
+        
+        try:
+            zh_index = languages.index('zh')
+        except ValueError:
+            zh_index = -1
+        
+        if zh_index != -1:
+            if country == 'tw':
+                languages[zh_index] = 'zh_TW'
+            else:
+                languages[zh_index] = 'zh_CN'
 
-    result = list(filter(lambda x: x in supported_languages, languages))
-    
-    if len(result) == 0:
+        result = list(filter(lambda x: x in supported_languages, languages))
+        
+        if len(result) == 0:
+            result = ['en']
+
+        # Ignore other languages if English is one of the official languages
+        if len(list(filter(lambda x: x == 'en', result))) != 0:
+            result = ['en']
+    except:
         result = ['en']
 
-    # Ignore other languages if English is one of the official languages
-    if len(list(filter(lambda x: x == 'en', result))) != 0:
-        result = ['en']
-    
     return result
 
 def search_artist(query):
@@ -68,8 +71,8 @@ def search_music(query, country=None):
         )
 
         for result in album_results:
-            details = yt.get_album(result.browseId)
-            details['browseId'] = result.browseId
+            details = yt.get_album(result['browseId'])
+            details['browseId'] = result['browseId']
             detailed_albums.append(details)
         
     json_string = json.dumps(detailed_albums)
