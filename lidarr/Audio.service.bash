@@ -595,38 +595,30 @@ DownloadProcess () {
 		fi
 
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
-			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
-			while IFS= read -r ytTrackId; do
+			ytTrackTitleList=$(yt-dlp --flat-playlist --print title "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
+			while IFS= read -r ytTrackTitle; do
 				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $6"
 				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $ytTrackId"
 				
-				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
+				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.videoId==\"$ytTrackTitle\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
-				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
+				ytTrackId=$(echo ${ytTrackData} | jq -r ".videoId")
 				ytTrackArtists=$(echo ${ytTrackData} | jq -r ".artists | map(.name) | join(\"\\\\\")")
 
-				if [[ -z "$ytTrackTitle" ]]; then
-					yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata \
-						--parse-metadata ":(?P<description>)" \
-						--parse-metadata ":(?P<webpage_url>)" \
-						--format ba[ext=m4a] \
-						-x --audio-quality 0 -P "$audioPath/incomplete" \
-						-o "%(track_number,playlist_index)s - %(track,title)s.%(ext)s" "https://youtube.com/watch?v=$ytTrackId" 2>&1 | tee -a "/config/logs/$logFileName"
-				else
-					yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata \
-						--parse-metadata ":(?P<description>)" \
-						--parse-metadata ":(?P<webpage_url>)" \
-						--parse-metadata "$ytTrackTitle:%(meta_title)s" \
-						--parse-metadata "$ytTrackArtists:%(meta_artist)s" \
-						--parse-metadata "$ytTrackAlbumName:(?P<album>)" \
-						--parse-metadata "$ytTrackTrackNumber:%(meta_track)s" \
-						--parse-metadata "$3:%(meta_year)s" \
-						--format ba[ext=m4a] \
-						-x --audio-quality 0 -P "$audioPath/incomplete" \
-						-o "${ytTrackTrackNumber} - ${ytTrackTitle}.%(ext)s" "https://youtube.com/watch?v=$ytTrackId" 2>&1 | tee -a "/config/logs/$logFileName"
-				fi
-			done <<< "$ytTrackIdList"
+				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata \
+					--parse-metadata ":(?P<description>)" \
+					--parse-metadata ":(?P<webpage_url>)" \
+					--parse-metadata "$ytTrackTitle:%(meta_title)s" \
+					--parse-metadata "$ytTrackArtists:%(meta_artist)s" \
+					--parse-metadata "$ytTrackAlbumName:(?P<album>)" \
+					--parse-metadata "$ytTrackTrackNumber:%(meta_track)s" \
+					--parse-metadata "$3:%(meta_year)s" \
+					--format ba[ext=m4a] \
+					-x --audio-quality 0 -P "$audioPath/incomplete" \
+					-o "${ytTrackTrackNumber} - ${ytTrackTitle}.%(ext)s" "https://youtube.com/watch?v=$ytTrackId" 2>&1 | tee -a "/config/logs/$logFileName"
+
+			done <<< "$ytTrackTitleList"
 
 			# Verify Client Works...
 			clientTestDlCount=$(find "$audioPath"/incomplete/ -type f -regex ".*/.*\.\(flac\|m4a\|mp3\)" | wc -l)
