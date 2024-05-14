@@ -597,7 +597,7 @@ DownloadProcess () {
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
 			while IFS= read -r ytTrackId; do
-				ytTrackData=$(echo \"$6\" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
+				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
 				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
