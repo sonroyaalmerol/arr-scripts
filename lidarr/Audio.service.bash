@@ -595,7 +595,7 @@ DownloadProcess () {
 
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
-			for ytTrackId in $(echo "$ytTrackIdList"); do
+			while IFS= read -r ytTrackId; do
 				ytTrackData=$(echo ${ytmArtistAlbumData} | jq -r ".tracks[] | select(.videoId=\"$ytTrackId\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
@@ -607,13 +607,13 @@ DownloadProcess () {
 					--parse-metadata ":(?P<webpage_url>)" \
 					--parse-metadata "$ytTrackTitle:%(meta_title)s" \
 					--parse-metadata "$ytTrackArtists:%(meta_artist)s" \
-					--parse-metadata "$ytTrackAlbumName:%(meta_album)s" \
+					--parse-metadata "$ytTrackAlbumName:%(album)s" \
 					--parse-metadata "$ytTrackTrackNumber:%(meta_track)s" \
-					--parse-metadata "$4:%(meta_year)s" \
+					--parse-metadata "$3:%(meta_year)s" \
 					--format ba[ext=m4a] \
 					-x --audio-quality 0 -P "$audioPath/incomplete" \
 					-o "${ytTrackTrackNumber} - ${ytTrackTitle}.%(ext)s" "https://youtube.com/watch?v=$ytTrackId" 2>&1 | tee -a "/config/logs/$logFileName"
-			done
+			done <<< "$ytTrackIdList"
 
 			# Verify Client Works...
 			clientTestDlCount=$(find "$audioPath"/incomplete/ -type f -regex ".*/.*\.\(flac\|m4a\|mp3\)" | wc -l)
