@@ -401,6 +401,7 @@ DownloadProcess () {
 	# $3 = Album Year that matches Album ID Metadata
 	# $4 = Album Title that matches Album ID Metadata
 	# $5 = Expected Track Count
+	# $6 = Artist Album Data (for YOUTUBE MUSIC only)
 
 	# Create Required Directories	
 	if [ ! -d "$audioPath/incomplete" ]; then
@@ -596,18 +597,18 @@ DownloadProcess () {
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
 			while IFS= read -r ytTrackId; do
-				ytTrackData=$(echo ${ytmArtistAlbumData} | jq -r ".tracks[] | select(.videoId=\"$ytTrackId\")")
+				ytTrackData=$(echo \"$6\" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
 				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
-				ytTrackArtists=$(echo ${ytTrackData} | jq -r ".artists | map(.name) | join(\"\\\\\")")
+				ytTrackArtists=$(echo ${ytTrackData} | jq -r ".artists | map(.name) | join("\\\\")")
 
 				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata \
 					--parse-metadata ":(?P<description>)" \
 					--parse-metadata ":(?P<webpage_url>)" \
 					--parse-metadata "$ytTrackTitle:%(meta_title)s" \
 					--parse-metadata "$ytTrackArtists:%(meta_artist)s" \
-					--parse-metadata "$ytTrackAlbumName:%(album)s" \
+					--parse-metadata "$ytTrackAlbumName:(?P<album>)" \
 					--parse-metadata "$ytTrackTrackNumber:%(meta_track)s" \
 					--parse-metadata "$3:%(meta_year)s" \
 					--format ba[ext=m4a] \
@@ -1969,7 +1970,7 @@ ArtistYouTubeSearch () {
 			# Execute Download
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $downloadedAlbumTitle ($downloadedReleaseYear)"
 			
-			DownloadProcess "$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount"
+			DownloadProcess "$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount" "$ytmArtistAlbumData"
 			
 			# End search if lidarr was successfully notified for import
 			if [ "$lidarrDownloadImportNotfication" == "true" ]; then
