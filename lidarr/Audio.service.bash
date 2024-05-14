@@ -401,6 +401,7 @@ DownloadProcess () {
 	# $3 = Album Year that matches Album ID Metadata
 	# $4 = Album Title that matches Album ID Metadata
 	# $5 = Expected Track Count
+	# $6 = Album Data (for YOUTUBE MUSIC only)
 
 	# Create Required Directories	
 	if [ ! -d "$audioPath/incomplete" ]; then
@@ -596,10 +597,10 @@ DownloadProcess () {
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
 			while IFS= read -r ytTrackId; do
-				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $ytmArtistAlbumData"
+				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $6"
 				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $ytTrackId"
 				
-				ytTrackData=$(echo "$ytmArtistAlbumData" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
+				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
 				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
@@ -625,7 +626,6 @@ DownloadProcess () {
 						-x --audio-quality 0 -P "$audioPath/incomplete" \
 						-o "${ytTrackTrackNumber} - ${ytTrackTitle}.%(ext)s" "https://youtube.com/watch?v=$ytTrackId" 2>&1 | tee -a "/config/logs/$logFileName"
 				fi
-				
 			done <<< "$ytTrackIdList"
 
 			# Verify Client Works...
@@ -1982,7 +1982,7 @@ ArtistYouTubeSearch () {
 			# Execute Download
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $downloadedAlbumTitle ($downloadedReleaseYear)"
 			
-			DownloadProcess "$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount"
+			DownloadProcess "$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount" "$ytmArtistAlbumData"
 			
 			# End search if lidarr was successfully notified for import
 			if [ "$lidarrDownloadImportNotfication" == "true" ]; then
@@ -2040,7 +2040,7 @@ FuzzyYouTubeMusicSearch () {
 				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music MATCH Found :: Calculated Difference = $diff"
 				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $ytmAlbumTitle"
 				
-				DownloadProcess "$ytmAlbumId" "YOUTUBE MUSIC" "" "$ytmAlbumTitle" "$downloadedTrackCount"
+				DownloadProcess "$ytmAlbumId" "YOUTUBE MUSIC" "" "$ytmAlbumTitle" "$downloadedTrackCount" "$ytmAlbumData"
 
 			else
 				log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Fuzzy Search :: YouTube Music :: $type :: $lidarrReleaseTitle :: $lidarrAlbumReleaseTitleClean vs $ytmAlbumTitleClean :: YouTube Music Match Not Found :: Calculated Difference ($diff) greater than $matchDistance"
