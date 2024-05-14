@@ -598,9 +598,9 @@ DownloadProcess () {
 			ytTrackTitleList=$(yt-dlp --flat-playlist --print title "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
 			while IFS= read -r ytTrackTitle; do
 				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $6"
-				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $ytTrackId"
+				log "$page :: $wantedAlbumListSource :: $processNumber of $wantedListAlbumTotal :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: DEBUG :: $ytTrackTitle"
 				
-				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.videoId==\"$ytTrackTitle\")")
+				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.title==\"$ytTrackTitle\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
 				ytTrackId=$(echo ${ytTrackData} | jq -r ".videoId")
