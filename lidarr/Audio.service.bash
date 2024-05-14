@@ -600,7 +600,7 @@ DownloadProcess () {
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
 				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
-				ytTrackArtists=$(echo ${ytTrackData} | jq -r ".artists | map(.name) | join("\\\\")")
+				ytTrackArtists=$(echo ${ytTrackData} | jq -r ".artists | map(.name) | join(\"\\\\\")")
 
 				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata \
 					--parse-metadata ":(?P<description>)" \
