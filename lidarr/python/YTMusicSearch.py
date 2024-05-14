@@ -67,7 +67,7 @@ def search_music(query, country=None):
             filter='albums',
         )
 
-        for result in search_results:
+        for result in album_results:
             details = yt.get_album(result.browseId)
             details['browseId'] = result.browseId
             detailed_albums.append(details)
