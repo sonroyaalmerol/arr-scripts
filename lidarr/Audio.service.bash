@@ -594,11 +594,26 @@ DownloadProcess () {
 		fi
 
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
-			if [ ${#1} -gt 11 ]; then
-				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] --yes-playlist -x --audio-quality 0 -P "$audioPath/incomplete" -o "%(track_number)s - %(track)s.%(ext)s" "https://youtube.com/playlist?list=$1" 2>&1 | tee -a "/config/logs/$logFileName"
-			else
-				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata --no-embed-chapters --no-embed-info-json --format ba[ext=m4a] -x --audio-quality 0 -P "$audioPath/incomplete" -o "%(track_number)s - %(track)s.%(ext)s" "https://youtube.com/watch?v=$1" 2>&1 | tee -a "/config/logs/$logFileName"
-			fi
+			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1)
+			for ytTrackId in $(echo "$ytTrackIdList"); do
+				ytTrackData=$(echo ${ytmArtistAlbumData} | jq -r ".tracks[] | select(.videoId=\"$ytTrackId\")")
+				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
+				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
+				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
+				ytTrackArtists=$(echo ${ytTrackData} | jq -r ".artists | map(.name) | join(\"\\\\\")")
+
+				yt-dlp -i --sponsorblock-remove music_offtopic --xattrs --embed-metadata \
+					--parse-metadata ":(?P<description>)" \
+					--parse-metadata ":(?P<webpage_url>)" \
+					--parse-metadata "$ytTrackTitle:%(meta_title)s" \
+					--parse-metadata "$ytTrackArtists:%(meta_artist)s" \
+					--parse-metadata "$ytTrackAlbumName:%(meta_album)s" \
+					--parse-metadata "$ytTrackTrackNumber:%(meta_track)s" \
+					--parse-metadata "$4:%(meta_year)s" \
+					--format ba[ext=m4a] \
+					-x --audio-quality 0 -P "$audioPath/incomplete" \
+					-o "${ytTrackTrackNumber} - ${ytTrackTitle}.%(ext)s" "https://youtube.com/watch?v=$ytTrackId" 2>&1 | tee -a "/config/logs/$logFileName"
+			done
 
 			# Verify Client Works...
 			clientTestDlCount=$(find "$audioPath"/incomplete/ -type f -regex ".*/.*\.\(flac\|m4a\|mp3\)" | wc -l)
