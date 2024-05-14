@@ -401,7 +401,6 @@ DownloadProcess () {
 	# $3 = Album Year that matches Album ID Metadata
 	# $4 = Album Title that matches Album ID Metadata
 	# $5 = Expected Track Count
-	# $6 = Artist Album Data (for YOUTUBE MUSIC only)
 
 	# Create Required Directories	
 	if [ ! -d "$audioPath/incomplete" ]; then
@@ -597,7 +596,7 @@ DownloadProcess () {
 		if [ "$2" == "YOUTUBE MUSIC" ]; then
 			ytTrackIdList=$(yt-dlp --flat-playlist --print id "https://youtube.com/playlist?list=$1" 2>&1 | sort -u) 
 			while IFS= read -r ytTrackId; do
-				ytTrackData=$(echo "$6" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
+				ytTrackData=$(echo "$ytmArtistAlbumData" | jq -r ".tracks[] | select(.videoId==\"$ytTrackId\")")
 				ytTrackTrackNumber=$(echo ${ytTrackData} | jq -r ".trackNumber")
 				ytTrackAlbumName=$(echo ${ytTrackData} | jq -r ".album")
 				ytTrackTitle=$(echo ${ytTrackData} | jq -r ".title")
@@ -1970,7 +1969,7 @@ ArtistYouTubeSearch () {
 			# Execute Download
 			log "$1 :: $lidarrArtistName :: $lidarrAlbumTitle :: $lidarrAlbumType :: Artist Search :: YouTube Music :: $lidarrReleaseTitle :: Downloading $downloadedTrackCount Tracks :: $downloadedAlbumTitle ($downloadedReleaseYear)"
 			
-			DownloadProcess "$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount" "$ytmArtistAlbumData"
+			DownloadProcess "$ytmArtistAlbumId" "YOUTUBE MUSIC" "$downloadedReleaseYear" "$downloadedAlbumTitle" "$downloadedTrackCount"
 			
 			# End search if lidarr was successfully notified for import
 			if [ "$lidarrDownloadImportNotfication" == "true" ]; then
